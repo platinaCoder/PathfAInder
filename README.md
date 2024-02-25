@@ -3,4 +3,6 @@ AI Architecture based on a BGP-Peering like protocol that doesn't use matrix mul
 
 Diagram:
 
-platinaCoder/PathfAInder/media/PathfAInder_Diagram.png
+<picture>
+ <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/platinaCoder/PathfAInder/main/media/PathfAInder_Diagram.png">
+</picture>
