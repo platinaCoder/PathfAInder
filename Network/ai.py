@@ -1,69 +1,100 @@
-def make_connection(weight, transform_fn=lambda x: x):
-    """Creates a connection with a given weight and an optional transformation function."""
-    def connection(input_value):
-        return transform_fn(input_value * weight)
-    return connection
+def create_connection(weight, transform_fn=lambda x: x):
+    """Creates a connection with a specified weight and an optional transformation function."""
+    return {"weight": weight, "transform": transform_fn}
 
-def make_node(node_id, network_state, peering_criteria):
-    """Creates a node with peering decision logic.
-    
-    Args:
-        node_id: Unique identifier for the node.
-        network_state: Shared state of the network, containing information about all nodes.
-        peering_criteria: Function to evaluate and select peers based on specific criteria.
-    """
-    def node(input_value):
-        # Evaluate potential peers from the network state
-        potential_peers = peering_criteria(network_state, node_id)
-        
-        # For demonstration, let's say the node simply communicates with its selected peers
-        outputs = []
-        for peer_id in potential_peers:
-            peer_node = network_state[peer_id]['node']
-            output = peer_node(input_value)  # This would be more complex in a real scenario
-            outputs.append(output)
-        
-        # Node's output could be based on its own logic, here simply summing outputs from peers
-        return sum(outputs)
-    
-    # Initial connections could be empty or based on initial peering logic
-    initial_peers = peering_criteria(network_state, node_id)
-    
-    return node, initial_peers
+def create_node(node_id, peering_criteria):
+    """Creates a node with a unique ID and a peering criteria function."""
+    return {"id": node_id, "peering_criteria": peering_criteria, "connections": []}
 
-def create_network(num_nodes):
-    """Creates a network with a specified number of nodes."""
-    network = []
-    for _ in range(num_nodes):
-        node, connections = make_node()  # Initially, nodes have no connections
-        network.append({'node': node, 'connections': connections})
-    return network
+def add_connection(network_state, from_node_id, to_node_id, connection):
+    """Adds a connection from one node to another within the network state."""
+    network_state[from_node_id]["connections"].append({"to": to_node_id, "connection": connection})
+    return network_state
 
-def add_connection(node, target_node, weight=1.0, transform_fn=lambda x: x):
-    """Adds a connection from one node to another with a specified weight and transformation function."""
-    connection = make_connection(weight, transform_fn)
-    node['connections'].append(connection)
-    return connection
+def establish_connections(network_state, node_id):
+    """Dynamically establishes connections for a node based on its peering criteria."""
+    node = network_state[node_id]
+    peer_ids = node["peering_criteria"](network_state, node_id)
+    for peer_id in peer_ids:
+        connection = create_connection(weight=1.0)  # Default weight; could be dynamic or based on criteria
+        node["connections"].append({"to": peer_id, "connection": connection})
 
-def scale_network(network, new_nodes, new_connections):
-    """Scales the network by adding new nodes and connections."""
-    # Add new nodes
-    for _ in range(new_nodes):
-        node, connections = make_node()
-        network.append({'node': node, 'connections': connections})
-    
-    # Example logic for adding new connections; specific logic will depend on the network structure
-    for i in range(min(len(network), new_connections)):
-        add_connection(network[i], network[(i+1) % len(network)], weight=1.2)  # Circular connections for example
+def initialize_network():
+    """Initializes an empty network state."""
+    return {}
 
-    return network
+def adjust_success_score(network_state, node_id, outcome):
+    if outcome == "success":
+        network_state[node_id]["success_score"] += 1
+    elif outcome == "failure":
+        network_state[node_id]["success_score"] -= 1  # Optional, based on your preference
+
+        def calculate_activation_strength(node):
+    # Example: Normalize the success score to a 0-1 range for activation strength
+    return min(max(node["success_score"] / MAX_SCORE, 0), 1)
+
+def register_node(network_state, node):
+    """Registers a new node in the network state."""
+    network_state[node["id"]] = node
+    return network_state
 
 def peering_criteria(network_state, node_id):
-    """Example peering criteria function that selects peers based on some criteria.
-    
-    For simplicity, this example selects peers randomly.
-    """
-    import random
-    potential_peers = [nid for nid in network_state if nid != node_id]  # Exclude self
-    selected_peers = random.sample(potential_peers, k=min(2, len(potential_peers)))  # Select up to 2 peers, for example
+    # Select peers based on their activation strength
+    peers = [(id, calculate_activation_strength(node)) for id, node in network_state.items() if id != node_id]
+    peers.sort(key=lambda x: x[1], reverse=True)  # Sort by strength, highest first
+    selected_peers = [peer[0] for peer in peers[:2]]  # Select top 2 peers
     return selected_peers
+
+def initialize_and_register_nodes(num_nodes):
+    """Initializes the network and registers a given number of nodes, establishing their initial connections."""
+    network = initialize_network()
+    for i in range(num_nodes):
+        node_id = f"Node_{i}"
+        node = create_node(node_id, peering_criteria)
+        network = register_node(network, node)
+    
+    # After all nodes are registered, establish connections based on peering criteria
+    for node_id in network.keys():
+        establish_connections(network, node_id)
+    
+    return network
+
+def activate_node(network_state, node_id, input_value):
+    """Activates a node, propagating the input value through its connections."""
+    node = network_state[node_id]
+    outputs = []
+    for connection_info in node["connections"]:
+        to_node = network_state[connection_info["to"]]
+        connection = connection_info["connection"]
+        transformed_input = connection["transform"](input_value * connection["weight"])
+        # Here you could activate the connected node or collect outputs for further processing
+        outputs.append(transformed_input)
+    # Process outputs based on node logic; for simplicity, we sum them
+    return sum(outputs)
+
+def adjust_connection_weight(network_state, from_node_id, to_node_id, outcome):
+    # Example adjustment logic
+    for conn in network_state[from_node_id]["connections"]:
+        if conn["to"] == to_node_id:
+            if outcome == "success":
+                conn["connection"]["weight"] += SUCCESS_REWARD  # Increment weight for success
+            else:
+                conn["connection"]["weight"] -= FAILURE_PENALTY  # Decrement weight for failure
+            break
+
+def update_trust_score(network_state, node_id, success=True):
+    if success:
+        network_state[node_id]["trust_score"] += TRUST_INCREMENT  # Increment for successful interaction
+
+def prune_network(network_state):
+    for node_id, node in list(network_state.items()):
+        # Prune connections below the weight threshold
+        node["connections"] = [conn for conn in node["connections"] if conn["connection"]["weight"] > WEIGHT_THRESHOLD]
+        # If a node has no connections, remove it from the network
+        if not node["connections"]:
+            del network_state[node_id]
+
+# Initialize the network with dynamic peering
+network_state = initialize_and_register_nodes(5)
+# Example: Inspect the network state to see established connections
+print(network_state)
