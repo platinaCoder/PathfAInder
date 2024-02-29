@@ -19,10 +19,6 @@ def establish_connections(network_state, node_id):
         connection = create_connection(weight=1.0)  # Default weight; could be dynamic or based on criteria
         node["connections"].append({"to": peer_id, "connection": connection})
 
-def initialize_network():
-    """Initializes an empty network state."""
-    return {}
-
 def adjust_success_score(network_state, node_id, outcome):
     if outcome == "success":
         network_state[node_id]["success_score"] += 1
