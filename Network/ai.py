@@ -29,9 +29,9 @@ def adjust_success_score(network_state, node_id, outcome):
     elif outcome == "failure":
         network_state[node_id]["success_score"] -= 1  # Optional, based on your preference
 
-        def calculate_activation_strength(node):
-    # Example: Normalize the success score to a 0-1 range for activation strength
-    return min(max(node["success_score"] / MAX_SCORE, 0), 1)
+    def calculate_activation_strength(node):
+        # Example: Normalize the success score to a 0-1 range for activation strength
+        return min(max(node["success_score"] / MAX_SCORE, 0), 1)
 
 def register_node(network_state, node):
     """Registers a new node in the network state."""
